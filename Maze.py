@@ -8,12 +8,6 @@ import time
 
 class Maze():
 
-    def on_double(self,event):
-        items = self.canvas.find_closest(event.x, event.y)
-        if items:
-            rect_id = items[0]
-            self.canvas.itemconfigure(rect_id, fill="green")
-
 
     def on_clickR(self, event):
         """
@@ -23,30 +17,23 @@ class Maze():
         self.on_move(event)
 
 
-    def on_clickL(self, event):
-        items = self.canvas.find_closest(event.x, event.y)
-        if items:
-            rect_id = items[0]
-            self.canvas.itemconfigure(rect_id, fill="pink")
-    
-
-
     def on_move(self, event):
         if self._dragging:
             x = self.canvas.canvasx(event.x)
             y = self.canvas.canvasy(event.y)
             
-            items = self.canvas.find_closest(x,y)
+            if x < self.AnchoFix and y < self.AltoFix:
+                items = self.canvas.find_closest(x,y)
+            else:
+                items = None
+
             if items:
                 rect_id = items[0]
-                if self.canvas.itemcget(rect_id, "fill") == "red" and self.last != rect_id:
-                    self.canvas.itemconfigure(rect_id, fill="yellow")
+                if self.canvas.itemcget(rect_id, "fill") == "#5a9089" and self.last != rect_id:
+                    self.canvas.itemconfigure(rect_id, fill="#334a58")
                 elif self.last != rect_id:
-                    self.canvas.itemconfigure(rect_id, fill="red")
+                    self.canvas.itemconfigure(rect_id, fill="#5a9089")
                 self.last = rect_id
-
-            print("NEWS : ",x,y)
-            print("OLDS : ",event.x, event.y)
 
 
     def on_release(self, event):
@@ -59,9 +46,9 @@ class Maze():
         """    
         start_time = time.monotonic()
         
-        for i in range (0, self.AnchoFix + 1, self.LadoFix):
-            for j in range (0, self.AltoFix + 1, self.LadoFix):
-                self.canvas.create_rectangle(i, j, i + self.LadoFix, j + self.LadoFix, fill='red')
+        for i in range (0, self.AnchoFix, self.LadoFix):
+            for j in range (0, self.AltoFix, self.LadoFix):
+                self.canvas.create_rectangle(i, j, i + self.LadoFix, j + self.LadoFix, fill="#5a9089")
 
         end_time = time.monotonic()
         self.duracionDibujoUpdate(start_time, end_time)
@@ -72,6 +59,83 @@ class Maze():
         text = "Duracion construccion : " + self.durationMaze
         self.duracionMaze.config(text=text)
         self.duracionMaze.update_idletasks()
+        self.ubicAgente()
+
+
+    def iniciaMovimientoM(self, event):
+        """ Metodo de clase que recuerda la posición de inicio del objeto a mover """
+        self.lastxM = event.x
+        self.lastyM = event.y
+        
+
+    def iniciaMovimiento(self, event):
+        """ Metodo de clase que recuerda la posición de inicio del objeto a mover """
+        self.lastx = event.x
+        self.lasty = event.y
+
+
+    def mueveAgente(self, event):
+        """ Metodo de clase que hace que el ratón tenga movimiento.
+            Siempre y cuando el circulo(ratón) cumpla todas las condiciones que serán descritas a continuación,
+            el ratón podrá moverse. 
+        """
+        
+        cumple = ((event.x - self.agente_radio >= 0) and (event.x + self.agente_radio <= int(self.AnchoFix))) \
+                 and ((event.y - self.agente_radio >= 0) and (event.y + self.agente_radio <= int(self.AltoFix)))
+
+        # Mueve el ratón.
+        ## Accion que pasa si el ratón se sale del canvas.
+        if cumple == False:
+            self.canvas.move(self.agente, 0, 0)
+            
+        else:
+            self.canvas.move(self.agente, event.x - self.lastx, event.y - self.lasty)
+            self.lastx = event.x
+            self.lasty = event.y
+
+
+
+    def mueveMeta(self, event):
+        """ Metodo de clase que hace que el ratón tenga movimiento.
+            Siempre y cuando el circulo(ratón) cumpla todas las condiciones que serán descritas a continuación,
+            el ratón podrá moverse. 
+        """
+        
+        cumple = ((event.x - self.agente_radio >= 0) and (event.x + self.agente_radio <= int(self.AnchoFix))) \
+                 and ((event.y - self.agente_radio >= 0) and (event.y + self.agente_radio <= int(self.AltoFix)))
+
+        # Mueve el ratón.
+        ## Accion que pasa si el ratón se sale del canvas.
+        if cumple == False:
+            self.canvas.move(self.meta, 0, 0)
+
+        else:
+            self.canvas.move(self.meta, event.x - self.lastxM, event.y - self.lastyM)
+            self.lastxM = event.x
+            self.lastyM = event.y
+
+
+    def esquinas(self,x,y):
+        '''Regresa una tupla (x1,y1,x2,y2)'''
+
+        self.agente_radio = 7
+        return x-self.agente_radio, y-self.agente_radio, \
+               x+self.agente_radio, y+self.agente_radio
+
+
+    def ubicAgente(self):
+        self.agente_x = 10
+        self.agente_y = 10
+        self.meta_x = self.AnchoFix - 10
+        self.meta_y = self.AltoFix - 10
+        self.meta = self.canvas.create_oval(self.esquinas(self.meta_x, self.meta_y), fill="#ffbf6b")
+        self.agente = self.canvas.create_oval(self.esquinas(self.agente_x, self.agente_y), fill="#d1675a")
+
+        self.canvas.tag_bind(self.agente, "<1>", self.iniciaMovimiento)
+        self.canvas.tag_bind(self.agente, "<B1-Motion>", self.mueveAgente)
+        self.canvas.tag_bind(self.meta, "<1>", self.iniciaMovimientoM)
+        self.canvas.tag_bind(self.meta, "<B1-Motion>", self.mueveMeta)
+
 
 
     def Ventana(self, alto, ancho):
@@ -124,10 +188,8 @@ class Maze():
         self.pencil = RawTurtle(self.fondo_ventana)
         self.pencil.pencolor("white")
         self.canvas.bind("<ButtonPress-1>", self.on_clickR)
-        self.canvas.bind("<ButtonPress-3>", self.on_clickL)
         self.canvas.bind("<B1-Motion>", self.on_move)
         self.canvas.bind("<ButtonRelease-1>", self.on_release)
-        self.canvas.bind("<Double-Button-1>", self.on_double)
 
         self.dibuja()
 
@@ -149,9 +211,11 @@ class Maze():
         self.root.resizable(False, False)
         self.last = None
 
+        #Titulo
         titulillo = tk.Message(self.root, text = "Maze Solver Machine", font = ("Courier",20), width = 500)
         titulillo.pack()
 
+        #Contenedor de Botones
         labelframe = tk.LabelFrame(self.root, text=" Parámetros ", bd = 5, font = 10)
         labelframe.pack(fill="x")
 
@@ -211,6 +275,7 @@ class Maze():
         self.duracionVoyage = tk.Label(labelframe, text="Duracion recorrido : " + self.durationRoute  )
         self.duracionVoyage.grid(column = 11, row = 0, padx = 8)
 
+        ## Flag de Arrastre
         self._dragging = False
         
         self.root.mainloop()
@@ -230,7 +295,6 @@ class Maze():
 
     def validatePositive(self,alto,ancho,lado):
         if alto > 0 and ancho > 0 and lado > 0:
-            print("aca")
             self.ValidarConfVentana(alto,ancho,lado)
 
         else:
@@ -238,26 +302,11 @@ class Maze():
 
 
     def ValidarConfVentana(self,alto,ancho,lado):
-
         #Lados del cuadro en INT
-        self.LadoFix = lado
-        
-        #Alto de la ventana arreglado (que aparezcan todos los cuadros)
-        if (alto % lado != 0):
-            self.AltoFix = (alto // lado + 1) * lado
-        else:
-            self.AltoFix = alto
-
-        #Ancho de la ventana arreglado (que aparezcan todos los cuadros)
-        if (ancho % lado != 0):
-            self.AnchoFix  = (ancho // lado + 1) * lado
-        else:
-            self.AnchoFix  = ancho
-
-
+        self.LadoFix = 20
+        self.AltoFix = alto * self.LadoFix
+        self.AnchoFix = ancho * self.LadoFix
         self.CrearVentana()
-
-
 
 
     def CrearVentana(self):
@@ -284,140 +333,13 @@ class Maze():
         self.Ventana(self.Xdef, self.Ydef)
         
 
-
-###################################################################################################################################
-###################################################################################################################################
-###################################################################################################################################
-###################################################################################################################################
 ###################################################################################################################################
 ###################################################################################################################################
 ###################################################################################################################################
 ###################################################################################################################################
 
 
-
-    @staticmethod
-    def deme_posicion(i, j):
-        """ Retorna la posicion superior izquierda en eje x, eje y
-            de un casilla i,j del laberinto.
-            Entradas:
-                i     : Fila del laberinto.
-                j     : Columna del laberinto.
-            Salidas:
-                (x,y) : Posición de la esquina superior izquierda
-                        en donde se encuentra la entrada (i,j)
-            Supuesto:
-                (i,j) es una posición válida en el laberinto.
-        """
-        x = self.Xdis + j * (self.Ancho + 1)
-        y = self.Ydis + i * (self.Alto  + 1)
-        return (x, y)
- 
-             
-    def Laberinto(self, laberinto):
-        """ Constructor para la creación de un laberinto.
-            Entradas:
-                 area_dibujo : TurtleScreen en donde se dibujará
-                               el laberinto.
-                 laberinto   : tira que contiene el diseño del
-                               laberinto.
-            Salidas:
-                 Instancia de la clase.
-                 Laberinto representado por una matriz, tal que
-                 la entrada i,j contiene: 0 - si la casilla está
-                 libre, 1 - si hay pared, 3 - posición en donde
-                 está el queso.
-            Restricciones:
-                 Todas las entradas de la tira son 0, 1 o 3. Las
-                 filas se representan por un cambio de línea.
-                 No hay líneas vacías.
-        """
-
-        self.Xdis = int(self.ladotext.get())
-        self.Ydis = int(self.ladotext.get())
-     
-        self.Alto = int(self.altext.get())
-        self.Ancho= int(self.anchtext.get())
-           
-        ## Construye una lista de listas a partir de la
-        ## tira que se recibe como parámetro.
-        lista = laberinto.split()
-        lista = [ x[:-1] if x[-1] == "\n" else x for x in lista]
-        lista = [[int(ch) for ch in x] for x in lista]
- 
- 
-        ## Crea los atributos.
-        self.laberinto = lista
-        self.lienzo = self.fondo_ventana
- 
-        ## Dibuja el laberinto.
-        self.dibuja_laberinto()
- 
-    def dibuja_laberinto(self):
-        """ Dibuja el laberinto.
-        Entradas:
-            Ninguna.
-        Salidas:
-            Dibujo del laberinto.
-        """
- 
-        self.lienzo.fondo_ventana.tracer(False)
-        self.lienzo.pencil.pencolor("white")
- 
-        ## Dibuja el laberinto.
- 
-        for i in range(len(self.laberinto)):
- 
-            for j in range(len(self.laberinto[i])):
- 
-                if self.laberinto[i][j] == 1:
-                    self.casilla("yellow", i, j)
-                elif self.laberinto[i][j] == 3:
-                    self.casilla("red", i, j)
-                elif self.laberinto[i][j] == 0:
-                    self.casilla("black", i, j)
- 
-        self.lienzo.fondo_ventana.tracer(True)
- 
-    def casilla(self, color, i, j):
-        """ Dibuja la casilla i, j con el color
-            indicado.
-        Entradas:
-            color : Color de la casilla a dibujar.
-            (i,j) : Ubicación de la casilla.
-        Salidas:
-            Dibujo de la casilla con el color indicado en
-            la posición (i,j) del laberinto.
-        Supuesto:
-            El color es uno válido en Tkinter.
-            (i,j) es una posición válida en el
-            laberinto.
-        """
- 
-        ## Determina la posición en los ejes
-        ## reales de la posición (i,j) de la
-        ## casilla.
-        x, y = self.deme_posicion(i, j)
- 
-        ## Prepara el lápiz para dibujar
-        ## un rectánculo relleno.
-        self.lienzo.pencil.fillcolor(color)
-        self.lienzo.pencil.pu()
-        self.lienzo.pencil.setpos(x, y)
-        self.lienzo.pencil.seth(0)
-        self.lienzo.pencil.pd()
-        self.lienzo.pencil.begin_fill()
- 
-        ## Dibuja la casilla con 4
-        ## movimientos !!!
-        for i in range(2):
-            self.lienzo.pencil.fd(Laberinto.Ancho+1)
-            self.lienzo.pencil.left(90)
-            self.lienzo.pencil.fd(Laberinto.Alto+1)
-            self.lienzo.pencil.left(90)
- 
-        ## Cierra el relleno.
-        self.lienzo.pencil.end_fill()
+    ## COLOR RECORRDIDO #EDF2F4 #D7EDF0 #D6CBE1 #AFB7D2 #978FB0
  
     def recorrido(self, i, j):
         """ Dado un laberinto en donde se ubica una meta,
@@ -468,14 +390,12 @@ class Maze():
             if camino: return [(i, j)] + camino
 
 
-
         #SuroEste
         #NoroEste
         #NorEste
         #SurEste
         #http://www.redblobgames.com/pathfinding/a-star/implementation.html
 
- 
         sleep(0.10)
         self.lienzo.fondo_ventana.tracer(False)
         self.casilla("black", i, j)
@@ -486,18 +406,8 @@ class Maze():
 
  
 def principal():
-    stringLab = "00000000000000\n" + \
-            "01111111011110\n" + \
-            "00000001000010\n" + \
-            "01111111111110\n" + \
-            "01111111111110\n" + \
-            "01111111111110\n" + \
-            "00000000003110"
 
     l1 = Maze()
-    #l1.Laberinto(stringLab)
-    #ll.recorrido(6,13)
-    #ll.reset()
- 
+
 if __name__ == "__main__":
     principal()
