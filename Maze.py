@@ -14,7 +14,6 @@ class Maze():
             rect_id = items[0]
             self.canvas.itemconfigure(rect_id, fill="green")
 
-        
 
     def on_clickR(self, event):
         """
@@ -34,13 +33,20 @@ class Maze():
 
     def on_move(self, event):
         if self._dragging:
-            items = self.canvas.find_closest(event.x, event.y)
+            x = self.canvas.canvasx(event.x)
+            y = self.canvas.canvasy(event.y)
+            
+            items = self.canvas.find_closest(x,y)
             if items:
                 rect_id = items[0]
-                if self.canvas.itemcget(rect_id, "fill") == "red":
+                if self.canvas.itemcget(rect_id, "fill") == "red" and self.last != rect_id:
                     self.canvas.itemconfigure(rect_id, fill="yellow")
-                else:
+                elif self.last != rect_id:
                     self.canvas.itemconfigure(rect_id, fill="red")
+                self.last = rect_id
+
+            print("NEWS : ",x,y)
+            print("OLDS : ",event.x, event.y)
 
 
     def on_release(self, event):
@@ -52,9 +58,11 @@ class Maze():
         Dibuja los cuadros dentro del Canvas 
         """    
         start_time = time.monotonic()
-        for i in range (0,150,15):
-            for j in range (0,150,15):
-                self.canvas.create_rectangle(i, j, i+15, j+15, fill='red')
+        
+        for i in range (0, self.AnchoFix + 1, self.LadoFix):
+            for j in range (0, self.AltoFix + 1, self.LadoFix):
+                self.canvas.create_rectangle(i, j, i + self.LadoFix, j + self.LadoFix, fill='red')
+
         end_time = time.monotonic()
         self.duracionDibujoUpdate(start_time, end_time)
 
@@ -102,7 +110,7 @@ class Maze():
 
         #Updated the screen before calculating the scrollregion
         self.root.update()
-        self.canvas.config(scrollregion=self.canvas.bbox("all"))
+        self.canvas.config(scrollregion=(0,0,alto,ancho))
                 
         ## Crea un TurtleScreen y la tortuga para dibujar
         self.fondo_ventana = TurtleScreen(self.canvas)
@@ -115,7 +123,6 @@ class Maze():
         ## Crea una tortuga para dibujar
         self.pencil = RawTurtle(self.fondo_ventana)
         self.pencil.pencolor("white")
-
         self.canvas.bind("<ButtonPress-1>", self.on_clickR)
         self.canvas.bind("<ButtonPress-3>", self.on_clickL)
         self.canvas.bind("<B1-Motion>", self.on_move)
@@ -139,6 +146,8 @@ class Maze():
 
         ## Crea la ventana y un canvas para dibujar
         self.root = tk.Tk()
+        self.root.resizable(False, False)
+        self.last = None
 
         titulillo = tk.Message(self.root, text = "Maze Solver Machine", font = ("Courier",20), width = 500)
         titulillo.pack()
@@ -184,7 +193,7 @@ class Maze():
         self.botonLimpia["state"] ="disabled"
 
         ## Boton Generar
-        self.botonLeer = tk.Button(labelframe, text="Generar", font = 8, command = self.CrearVentana,  \
+        self.botonLeer = tk.Button(labelframe, text="Generar", font = 8, command = self.validateInt,  \
                                    activeforeground = "Blue", padx = 2, relief = "groove")
         self.botonLeer.grid(column = 8, row = 0, padx = 8, pady = 10)
 
@@ -207,14 +216,48 @@ class Maze():
         self.root.mainloop()
 
 
-##    def validateInput(self):
-##        try:
-##            if int(self.altext.get()) > 0 and int(self.anchtext.get()) > 0 and int(self.ladotext.get()) > 0:
-##                CrearVentana()
-##            else:
-##                tk.messagebox.showerror("Error", "Valores deben ser mayores a 0")     
-##        except:
-##            tk.messagebox.showerror("Error", "Valores deben ser numericos")
+    def validateInt(self):
+        try:
+            alto = int(self.altext.get())
+            ancho = int(self.anchtext.get())
+            lado = int(self.ladotext.get())
+            
+            self.validatePositive(alto,ancho,lado)
+  
+        except ValueError:
+            tk.messagebox.showerror("Error", "Valores deben ser numericos")
+
+
+    def validatePositive(self,alto,ancho,lado):
+        if alto > 0 and ancho > 0 and lado > 0:
+            print("aca")
+            self.ValidarConfVentana(alto,ancho,lado)
+
+        else:
+            tk.messagebox.showerror("Error", "Valores deben ser positivos")
+
+
+    def ValidarConfVentana(self,alto,ancho,lado):
+
+        #Lados del cuadro en INT
+        self.LadoFix = lado
+        
+        #Alto de la ventana arreglado (que aparezcan todos los cuadros)
+        if (alto % lado != 0):
+            self.AltoFix = (alto // lado + 1) * lado
+        else:
+            self.AltoFix = alto
+
+        #Ancho de la ventana arreglado (que aparezcan todos los cuadros)
+        if (ancho % lado != 0):
+            self.AnchoFix  = (ancho // lado + 1) * lado
+        else:
+            self.AnchoFix  = ancho
+
+
+        self.CrearVentana()
+
+
 
 
     def CrearVentana(self):
@@ -224,20 +267,21 @@ class Maze():
         self.botonLeer.config(state='disabled')
         self.movDiagAble.config(state='disabled')
         self.botonLimpia["state"] ="normal"
-        self.rutaShow["state"] ="normal"
-        
-        
-        if int(self.altext.get()) * int(self.ladotext.get()) + 20 < 550:
-            Xdef = 550
-        else:
-            Xdef = int(self.altext.get()) * int(self.ladotext.get()) + 20
+        self.rutaShow["state"] ="normal" 
 
-        if int(self.anchtext.get()) * int(self.ladotext.get()) + 20 < 1320:
-            Ydef = 1320
+        # Crear una ventana default si es muy pequeño el Laberinto
+        # o agrandar la pantalla si es muy grande 
+        if self.AltoFix < 550:
+            self.Xdef = 550
         else:
-            Ydef = int(self.anchtext.get()) * int(self.ladotext.get()) + 20
+            self.Xdef = self.AltoFix
+
+        if self.AnchoFix < 1300:
+            self.Ydef = 1320
+        else:
+            self.Ydef = self.AnchoFix 
         
-        self.Ventana(Xdef, Ydef)
+        self.Ventana(self.Xdef, self.Ydef)
         
 
 
