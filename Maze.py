@@ -1,10 +1,11 @@
 from turtle import TurtleScreen, RawTurtle, TK
-from random import randint
 from time import *
 from datetime import timedelta
 import tkinter as tk
 from tkinter import Text
 import time
+from math import sqrt
+
 
 class Maze():
 
@@ -31,8 +32,12 @@ class Maze():
                 rect_id = items[0]
                 if self.canvas.itemcget(rect_id, "fill") == "#5a9089" and self.last != rect_id:
                     self.canvas.itemconfigure(rect_id, fill="#334a58")
-                elif self.last != rect_id:
+                elif self.canvas.itemcget(rect_id, "fill") == "#334a58" and self.last != rect_id:
                     self.canvas.itemconfigure(rect_id, fill="#5a9089")
+                else:
+                    pass
+                    
+                
                 self.last = rect_id
 
 
@@ -45,13 +50,24 @@ class Maze():
         Dibuja los cuadros dentro del Canvas 
         """    
         start_time = time.monotonic()
-        
+
+        k = 6
         for i in range (0, self.AnchoFix, self.LadoFix):
             for j in range (0, self.AltoFix, self.LadoFix):
                 self.canvas.create_rectangle(i, j, i + self.LadoFix, j + self.LadoFix, fill="#5a9089")
+        
+            
 
         end_time = time.monotonic()
         self.duracionDibujoUpdate(start_time, end_time)
+
+
+    def Limpiar(self):
+        """
+        Elimina el juego
+        """    
+        self.root.destroy()
+        l1 = Maze()
 
 
     def duracionDibujoUpdate(self,start_time, end_time):
@@ -79,7 +95,7 @@ class Maze():
             Siempre y cuando el circulo(ratón) cumpla todas las condiciones que serán descritas a continuación,
             el ratón podrá moverse. 
         """
-        
+        self._dragging = False
         cumple = ((event.x - self.agente_radio >= 0) and (event.x + self.agente_radio <= int(self.AnchoFix))) \
                  and ((event.y - self.agente_radio >= 0) and (event.y + self.agente_radio <= int(self.AltoFix)))
 
@@ -89,20 +105,22 @@ class Maze():
             self.canvas.move(self.agente, 0, 0)
             
         else:
-            self.canvas.move(self.agente, event.x - self.lastx, event.y - self.lasty)
-            self.lastx = event.x
-            self.lasty = event.y
-
-
+            moveX = (self.canvas.canvasx(event.x) // 20) * 20 + 10
+            moveY = (self.canvas.canvasy(event.y) // 20) * 20 + 10
+            self.canvas.coords(self.agente, moveX-7, moveY-7, moveX+7,  moveY+7)
+            self.lastx = moveX
+            self.lasty = moveY
+            
 
     def mueveMeta(self, event):
         """ Metodo de clase que hace que el ratón tenga movimiento.
             Siempre y cuando el circulo(ratón) cumpla todas las condiciones que serán descritas a continuación,
             el ratón podrá moverse. 
         """
-        
+        self._dragging = False
         cumple = ((event.x - self.agente_radio >= 0) and (event.x + self.agente_radio <= int(self.AnchoFix))) \
                  and ((event.y - self.agente_radio >= 0) and (event.y + self.agente_radio <= int(self.AltoFix)))
+
 
         # Mueve el ratón.
         ## Accion que pasa si el ratón se sale del canvas.
@@ -110,9 +128,11 @@ class Maze():
             self.canvas.move(self.meta, 0, 0)
 
         else:
-            self.canvas.move(self.meta, event.x - self.lastxM, event.y - self.lastyM)
-            self.lastxM = event.x
-            self.lastyM = event.y
+            moveX = (self.canvas.canvasx(event.x) // 20) * 20 + 10
+            moveY = (self.canvas.canvasy(event.y) // 20) * 20 + 10
+            self.canvas.coords(self.meta, moveX-7, moveY-7, moveX+7,  moveY+7)
+            self.lastxM = moveX
+            self.lastyM = moveY
 
 
     def esquinas(self,x,y):
@@ -128,15 +148,151 @@ class Maze():
         self.agente_y = 10
         self.meta_x = self.AnchoFix - 10
         self.meta_y = self.AltoFix - 10
-        self.meta = self.canvas.create_oval(self.esquinas(self.meta_x, self.meta_y), fill="#ffbf6b")
-        self.agente = self.canvas.create_oval(self.esquinas(self.agente_x, self.agente_y), fill="#d1675a")
-
+        self.meta = self.canvas.create_oval(self.esquinas(self.meta_x, self.meta_y), fill="#FFD700")
+        self.agente = self.canvas.create_oval(self.esquinas(self.agente_x, self.agente_y), fill="#ff6600")
         self.canvas.tag_bind(self.agente, "<1>", self.iniciaMovimiento)
         self.canvas.tag_bind(self.agente, "<B1-Motion>", self.mueveAgente)
         self.canvas.tag_bind(self.meta, "<1>", self.iniciaMovimientoM)
         self.canvas.tag_bind(self.meta, "<B1-Motion>", self.mueveMeta)
 
 
+    def Astar(self):
+        self.rutaShow["state"] ="disabled"
+        
+        ## Algoritmo de recorrido del raton
+        opened = []
+        closed = []
+        First = 6
+        self.AltoS = int(self.altext.get())
+        self.AnchoS = int(self.anchtext.get())
+        Last = (self.AnchoS * self.AltoS) + (First - 1)
+        
+        # Donde esta el Agente + (Centrado) | Puro Centro
+        AgX = self.canvas.coords(self.agente)[0] + 7
+        AgY = self.canvas.coords(self.agente)[1] + 7
+
+        # Donde esta la meta + (Centrado) | Puro Centro
+        Mtx = self.canvas.coords(self.meta)[0] + 7
+        Mty = self.canvas.coords(self.meta)[1] + 7
+
+        # Devuelve el ID de Agente y Meta
+        self.Agent_ID = self.canvas.find_closest(AgX + 9 , AgY + 9)[0]
+        self.Meta_ID  = self.canvas.find_closest(Mtx + 9 , Mty + 9)[0]
+
+        # Indica si se llego a la meta
+        found = 0
+
+        #SI ES PARED (Cortocircuito)
+        if self.isWall(self.Agent_ID): self.noPathFound()
+        elif self.isWall(self.Meta_ID): self.noPathFound()
+        else:
+            start_time = time.monotonic()
+            opened.append(self.Agent_ID)
+
+            while len(opened) != 0:
+
+                cantidades = []
+                
+                for casilla in opened:
+                    CostoAgente = self.adyacentesCamino(casilla, self.Agent_ID)
+                    Heuristica = self.Heuristica(casilla, Mtx, Mty)
+                    cantidades.append(CostoAgente + Heuristica)
+
+
+                FindMinimo = min(cantidades)
+                Mindex = cantidades.index(FindMinimo)
+                Min_ID = opened[Mindex]
+
+                if (self.Meta_ID == Min_ID):
+                    self.canvas.itemconfigure(self.Meta_ID, fill="#D7EDF0")
+                    end_time = time.monotonic()
+                    self.duracionResolucion(start_time, end_time)
+                    found = 1
+                    break
+
+                else:
+                    self.canvas.itemconfigure(Min_ID, fill="#D7EDF0")
+
+                    #Crear los sucesores
+
+
+                    #NORTE
+                    if Min_ID % self.AltoS != 6:
+                        Norte = Min_ID - 1
+
+                        if (Norte not in opened) and (Norte not in closed) and (not self.isWall(Norte)):
+                            opened.append(Norte)
+
+                    #SUR
+                    if Min_ID % self.AltoS != 5:
+                        Sur = Min_ID + 1
+
+                        if (Sur not in opened) and (Sur not in closed) and (not self.isWall(Sur)):
+                            opened.append(Sur)
+                            
+                    #ESTE
+                    if Min_ID + self.AltoS < Last:
+                        Este = Min_ID + self.AltoS
+
+                        if (Este not in opened) and (Este not in closed) and (not self.isWall(Este)):
+                            opened.append(Este)
+                            
+                    #OESTE
+                    if Min_ID - self.AltoS > 6:
+                        Oeste = Min_ID - self.AltoS
+
+                        if (Oeste not in opened) and (Oeste not in closed) and (not self.isWall(Oeste)):
+                            opened.append(Oeste)
+
+
+
+                    # El ya visitado es cerrado
+                    Visited = opened[Mindex]
+                    opened.pop(Mindex)
+                    closed.append(Visited)
+
+
+            if not found:
+                self.noPathFound()
+
+            else:
+                self.PathFound()
+
+
+
+    def isWall(self, ID):
+        if self.canvas.itemcget(ID, "fill") == "#334a58":
+            return True
+        else:
+            return False
+
+        
+    def adyacentesCamino(self, ID1, ID2):
+        Dist = abs(int(ID2) - int(ID1))
+        vLado = int(self.ladotext.get())
+        return vLado * ((Dist // self.AnchoS) + (Dist // self.AltoS))
+
+
+    def Heuristica(self, casilla, X2, Y2):
+        X1 = self.canvas.coords(casilla)[0] + 7
+        Y1 = self.canvas.coords(casilla)[1] + 7
+
+        return sqrt((X2 - X1)**2 + (Y2 - Y1)**2)
+
+
+    def duracionResolucion(self, start_time, end_time):
+        self.durationVoyage = str(timedelta(seconds = end_time - start_time))[0:10]
+        text = "Duracion recorrido : " + self.durationVoyage
+        self.duracionVoyage.config(text=text)
+        self.duracionVoyage.update_idletasks()
+        
+
+    def noPathFound(self):
+        tk.messagebox.showerror("No Path", "No hay ruta hacia el destino")
+
+    def PathFound(self):
+        tk.messagebox.showerror("Listo", "Has llegado al destino")
+            
 
     def Ventana(self, alto, ancho):
         """ Crea una ventana para dibujar el laberinto.
@@ -151,7 +307,6 @@ class Maze():
         """
         assert isinstance(alto, int) and alto > 0
         assert isinstance(ancho, int) and ancho > 0
-
 
         #SCROLLBAR
         yscrollbar = tk.Scrollbar(self.root)
@@ -194,7 +349,6 @@ class Maze():
         self.dibuja()
 
 
-
     def __init__(self):
         """ Crea una ventana para dibujar el laberinto.
             Entradas:
@@ -212,7 +366,7 @@ class Maze():
         self.last = None
 
         #Titulo
-        titulillo = tk.Message(self.root, text = "Maze Solver Machine", font = ("Courier",20), width = 500)
+        titulillo = tk.Message(self.root, text = "◄ ♦ ○ Maze Solver Machine ♦ ○ ►", font = ("Courier",20), width = 500)
         titulillo.pack()
 
         #Contenedor de Botones
@@ -247,11 +401,12 @@ class Maze():
         self.ladotext.grid(column = 5, row = 0, padx = 8)
 
         ## Diagonal
-        self.movDiagAble = tk.Checkbutton(labelframe, text="Movimiento Diagonal")
+        self.DiagOn = tk.IntVar()
+        self.movDiagAble = tk.Checkbutton(labelframe, text="Movimiento Diagonal", variable = self.DiagOn)
         self.movDiagAble.grid(column = 6, row = 0, padx = 8)
 
         ## Limpiar
-        self.botonLimpia = tk.Button(labelframe, text="Limpiar Laberinto", font = "5", \
+        self.botonLimpia = tk.Button(labelframe, text="Limpiar Laberinto", font = "5", command = self.Limpiar, \
                                      activeforeground = "Blue", padx = 2, relief = "groove")
         self.botonLimpia.grid(column = 7, row = 0, padx = 8 )
         self.botonLimpia["state"] ="disabled"
@@ -262,7 +417,7 @@ class Maze():
         self.botonLeer.grid(column = 8, row = 0, padx = 8, pady = 10)
 
         ##Mostrar Ruta
-        self.rutaShow = tk.Button(labelframe, text="Mostrar Ruta", font = 8,  \
+        self.rutaShow = tk.Button(labelframe, text="Mostrar Ruta", font = 8, command = self.Astar, \
                                    activeforeground = "Blue", padx = 2, relief = "groove")
         self.rutaShow.grid(column = 9, row = 0, padx = 8, pady = 10)
         self.rutaShow["state"] ="disabled"
@@ -319,7 +474,8 @@ class Maze():
         self.rutaShow["state"] ="normal" 
 
         # Crear una ventana default si es muy pequeño el Laberinto
-        # o agrandar la pantalla si es muy grande 
+        # o agrandar la pantalla si es muy grande
+        
         if self.AltoFix < 550:
             self.Xdef = 550
         else:
@@ -331,79 +487,7 @@ class Maze():
             self.Ydef = self.AnchoFix 
         
         self.Ventana(self.Xdef, self.Ydef)
-        
-
-###################################################################################################################################
-###################################################################################################################################
-###################################################################################################################################
-###################################################################################################################################
-
-
-    ## COLOR RECORRDIDO #EDF2F4 #D7EDF0 #D6CBE1 #AFB7D2 #978FB0
  
-    def recorrido(self, i, j):
-        """ Dado un laberinto en donde se ubica una meta,
-            retorna en una lista de pares ordenados (x,y)
-            que indican el camino desde una posición inicial
-            (i,j) hasta la posición en que se encuentra el
-            queso.
-            Entradas:
-                 (i, j) : posición inicial a partir de donde
-                          se realizará la búsqueda de un camino
-                          hasta la posición del queso.
-            Salidas:
-                 Lista con las casillas, expresadas como pares
-                 ordenados, que llevan desde la posición inicial
-                 hasta la posición en que se encuentra el queso.
-                 Si no existe un camino retorna la lista vacía.
-        """
- 
-        if self.laberinto[i][j] == 3:
-            return [(i, j)]
- 
-        if self.laberinto[i][j] == 1:
-            return []
- 
-        self.laberinto[i][j] = -1
- 
-        sleep(0.01)
-        self.lienzo.fondo_ventana.tracer(False)
-        self.casilla("cyan", i, j)
-        self.lienzo.fondo_ventana.tracer(True)
- 
-        if i > 0 and self.laberinto[i - 1][j] in [0, 3]:     # Norte
-            camino = self.recorrido(i - 1, j)
-            if camino: return [(i, j)] + camino
- 
-        if j < len(self.laberinto[i]) - 1 and \
-           self.laberinto[i][j + 1] in [0, 3]:               # Este
-            camino = self.recorrido(i, j + 1)
-            if camino: return [(i, j)] + camino
- 
-        if i < len(self.laberinto) - 1 and \
-           self.laberinto[i + 1][j] in [0, 3]:               # Sur
-            camino = self.recorrido(i + 1, j)
-            if camino: return [(i, j)] + camino
- 
-        if j > 0 and self.laberinto[i][j - 1] in [0, 3]:     # Oeste
-            camino = self.recorrido(i, j - 1) 
-            if camino: return [(i, j)] + camino
-
-
-        #SuroEste
-        #NoroEste
-        #NorEste
-        #SurEste
-        #http://www.redblobgames.com/pathfinding/a-star/implementation.html
-
-        sleep(0.10)
-        self.lienzo.fondo_ventana.tracer(False)
-        self.casilla("black", i, j)
-        self.lienzo.fondo_ventana.tracer(True)
- 
-        return []
-
-
  
 def principal():
 
