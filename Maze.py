@@ -156,6 +156,17 @@ class Maze():
         self.canvas.tag_bind(self.meta, "<B1-Motion>", self.mueveMeta)
 
 
+    def disableCanvas(self):
+        self.canvas.tag_unbind(self.agente, "<1>")
+        self.canvas.tag_unbind(self.agente, "<B1-Motion>")
+        self.canvas.tag_unbind(self.meta, "<1>")
+        self.canvas.tag_unbind(self.meta, "<B1-Motion>")
+        self.canvas.unbind("<ButtonPress-1>")
+        self.canvas.unbind("<B1-Motion>")
+        self.canvas.unbind("<ButtonRelease-1>")
+        self.Astar()
+
+
     def Astar(self):
         self.rutaShow["state"] ="disabled"
         
@@ -181,6 +192,7 @@ class Maze():
 
         # Indica si se llego a la meta
         found = 0
+        ultimo = self.Agent_ID
 
         #SI ES PARED (Cortocircuito)
         if self.isWall(self.Agent_ID): self.noPathFound()
@@ -194,8 +206,16 @@ class Maze():
                 cantidades = []
                 
                 for casilla in opened:
-                    CostoAgente = self.adyacentesCamino(casilla, self.Agent_ID)
+    
                     Heuristica = self.Heuristica(casilla, Mtx, Mty)
+
+                    if casilla + 1 == ultimo or casilla - 1 == ultimo or casilla == self.Agent_ID or \
+                       casilla + self.AltoS == ultimo or casilla - self.AltoS == ultimo:
+                        CostoAgente = self.adyacentesCamino(casilla, self.Agent_ID)
+                        
+                    else:
+                        CostoAgente = self.adyacentesCaminoDG(casilla, self.Agent_ID)
+                        
                     cantidades.append(CostoAgente + Heuristica)
 
 
@@ -245,8 +265,40 @@ class Maze():
                             opened.append(Oeste)
 
 
+                    if self.DiagOn.get():
+
+                        #NOROESTE
+                        if Min_ID % self.AltoS != 6 and Min_ID - self.AltoS > 6 :
+                            Noroeste = (Min_ID - self.AltoS) - 1
+
+                            if (Noroeste not in opened) and (Noroeste not in closed) and (not self.isWall(Noroeste)):
+                                opened.append(Noroeste)
+                        
+                        #NORESTE
+                        if Min_ID % self.AltoS != 6 and Min_ID + self.AltoS < Last :
+                            Noreste = (Min_ID + self.AltoS) - 1
+
+                            if (Noreste not in opened) and (Noreste not in closed) and (not self.isWall(Noreste)):
+                                opened.append(Noreste)
+                                
+                        #SUROESTE
+                        if Min_ID % self.AltoS != 5 and Min_ID - self.AltoS > 6 :
+                            Suroeste = (Min_ID - self.AltoS) + 1
+
+                            if (Suroeste not in opened) and (Suroeste not in closed) and (not self.isWall(Suroeste)):
+                                opened.append(Suroeste)
+
+                        
+                        #SURESTE
+                        if Min_ID % self.AltoS != 5 and Min_ID + self.AltoS < Last :
+                            Sureste = (Min_ID + self.AltoS) + 1
+
+                            if (Sureste not in opened) and (Sureste not in closed) and (not self.isWall(Sureste)):
+                                opened.append(Sureste)
+
 
                     # El ya visitado es cerrado
+                    ultimo = Min_ID
                     Visited = opened[Mindex]
                     opened.pop(Mindex)
                     closed.append(Visited)
@@ -273,10 +325,15 @@ class Maze():
         return vLado * ((Dist // self.AnchoS) + (Dist // self.AltoS))
 
 
+    def adyacentesCaminoDG(self, ID1, ID2):
+        Dist = abs(int(ID2) - int(ID1))
+        vLado = int(self.ladotext.get())
+        return (vLado * sqrt(2)) * ((Dist // self.AnchoS) + (Dist // self.AltoS))
+
+
     def Heuristica(self, casilla, X2, Y2):
         X1 = self.canvas.coords(casilla)[0] + 7
         Y1 = self.canvas.coords(casilla)[1] + 7
-
         return sqrt((X2 - X1)**2 + (Y2 - Y1)**2)
 
 
@@ -289,6 +346,7 @@ class Maze():
 
     def noPathFound(self):
         tk.messagebox.showerror("No Path", "No hay ruta hacia el destino")
+        
 
     def PathFound(self):
         tk.messagebox.showerror("Listo", "Has llegado al destino")
@@ -366,7 +424,7 @@ class Maze():
         self.last = None
 
         #Titulo
-        titulillo = tk.Message(self.root, text = "◄ ♦ ○ Maze Solver Machine ♦ ○ ►", font = ("Courier",20), width = 500)
+        titulillo = tk.Message(self.root, text = "◄ ♦ ○ Maze Solver Machine ○ ♦ ►", font = ("Courier",20), width = 500)
         titulillo.pack()
 
         #Contenedor de Botones
@@ -417,7 +475,7 @@ class Maze():
         self.botonLeer.grid(column = 8, row = 0, padx = 8, pady = 10)
 
         ##Mostrar Ruta
-        self.rutaShow = tk.Button(labelframe, text="Mostrar Ruta", font = 8, command = self.Astar, \
+        self.rutaShow = tk.Button(labelframe, text="Mostrar Ruta", font = 8, command = self.disableCanvas, \
                                    activeforeground = "Blue", padx = 2, relief = "groove")
         self.rutaShow.grid(column = 9, row = 0, padx = 8, pady = 10)
         self.rutaShow["state"] ="disabled"
