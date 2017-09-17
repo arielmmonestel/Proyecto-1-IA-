@@ -5,6 +5,16 @@ import tkinter as tk
 from tkinter import Text
 import time
 from math import sqrt
+import functools
+
+def catch_exception(f):
+    @functools.wraps(f)
+    def func(*args, **kwargs):
+        try:
+            return f(*args, **kwargs)
+        except Exception as e:
+            print(" - Se ha cerrado el programa sin finalizar el recorrido - ")
+    return func
 
 
 class Maze():
@@ -30,19 +40,18 @@ class Maze():
 
             if items:
                 rect_id = items[0]
-                if self.canvas.itemcget(rect_id, "fill") == "#5a9089" and self.last != rect_id:
+                if self.canvas.itemcget(rect_id, "fill") == "#5a9089" and self.lastBttn != rect_id:
                     self.canvas.itemconfigure(rect_id, fill="#334a58")
-                elif self.canvas.itemcget(rect_id, "fill") == "#334a58" and self.last != rect_id:
+                elif self.canvas.itemcget(rect_id, "fill") == "#334a58" and self.lastBttn != rect_id:
                     self.canvas.itemconfigure(rect_id, fill="#5a9089")
                 else:
                     pass
-                    
-                
-                self.last = rect_id
 
+                self.lastBttn  = rect_id
 
     def on_release(self, event):
         self._dragging = False
+        self.lastBttn  = None
 
 
     def dibuja(self):
@@ -54,10 +63,8 @@ class Maze():
         k = 6
         for i in range (0, self.AnchoFix, self.LadoFix):
             for j in range (0, self.AltoFix, self.LadoFix):
-                self.canvas.create_rectangle(i, j, i + self.LadoFix, j + self.LadoFix, fill="#5a9089")
+                self.canvas.create_rectangle(i, j, i + self.LadoFix, j + self.LadoFix, fill="#5a9089", outline = "#146d60")
         
-            
-
         end_time = time.monotonic()
         self.duracionDibujoUpdate(start_time, end_time)
 
@@ -71,7 +78,7 @@ class Maze():
 
 
     def duracionDibujoUpdate(self,start_time, end_time):
-        self.durationMaze = str(timedelta(seconds = end_time - start_time))[0:10]
+        self.durationMaze = str(timedelta(seconds = end_time - start_time))[0:12]
         text = "Duracion construccion : " + self.durationMaze
         self.duracionMaze.config(text=text)
         self.duracionMaze.update_idletasks()
@@ -167,17 +174,101 @@ class Maze():
         self.Astar()
 
 
+    #HEURISTICA
+    def gridDistance(self, casilla, X2, Y2):
+        X1 = self.canvas.coords(casilla)[0] + 7
+        Y1 = self.canvas.coords(casilla)[1] + 7
+        return sqrt((X2 - X1)**2 + (Y2 - Y1)**2)
+
+    #HEURISTICA
+    def gridDistanceR(self, casilla, casilla2):
+        X1 = self.canvas.coords(casilla)[0] + 7
+        Y1 = self.canvas.coords(casilla)[1] + 7
+        X2 = self.canvas.coords(casilla2)[0] + 7
+        Y2 = self.canvas.coords(casilla2)[1] + 7
+        return sqrt((X2 - X1)**2 + (Y2 - Y1)**2)
+
+
+        # Lista Visitados, Costo
+
+    def getMin(self, opens, score):
+        minNeighb = opens[0]
+        for i in opens:
+            if  score[minNeighb] > score[i]:
+                minNeighb = i
+
+        return minNeighb
+
+
+    def isWall(self, ID):
+        if self.canvas.itemcget(ID, "fill") == "#334a58":
+            return True
+        else:
+            return False
+
+
+    def getNeighbors(self, Min_ID):
+        neighbList = []
+
+        if Min_ID % self.AltoS != 6:
+            Norte = Min_ID - 1
+            if (not self.isWall(Norte)):neighbList.append(Norte)
+            
+    
+        if Min_ID % self.AltoS != 5:
+            Sur = Min_ID + 1
+            if (not self.isWall(Sur)): neighbList.append(Sur)
+                                
+                        
+        if Min_ID + self.AltoS < self.Last:
+            Este = Min_ID + self.AltoS
+            if (not self.isWall(Este)): neighbList.append(Este)
+                                
+                        
+        if Min_ID - self.AltoS > 6:
+            Oeste = Min_ID - self.AltoS
+            if (not self.isWall(Oeste)): neighbList.append(Oeste)
+
+
+        if self.DiagOn.get():
+
+            #NOROESTE
+            if Min_ID % self.AltoS != 6 and Min_ID - self.AltoS > 6 :
+                Noroeste = (Min_ID - self.AltoS) - 1
+
+                if (not self.isWall(Noroeste)):neighbList.append(Noroeste)
+                        
+            #NORESTE
+            if Min_ID % self.AltoS != 6 and Min_ID + self.AltoS < self.Last :
+                Noreste = (Min_ID + self.AltoS) - 1
+
+                if (not self.isWall(Noreste)):neighbList.append(Noreste)
+                                
+            #SUROESTE
+            if Min_ID % self.AltoS != 5 and Min_ID - self.AltoS > 6 :
+                Suroeste = (Min_ID - self.AltoS) + 1
+
+                if (not self.isWall(Suroeste)): neighbList.append(Suroeste)
+
+                        
+            #SURESTE
+            if Min_ID % self.AltoS != 5 and Min_ID + self.AltoS < self.Last :
+                Sureste = (Min_ID + self.AltoS) + 1
+
+                if(not self.isWall(Sureste)): neighbList.append(Sureste)
+
+
+        return neighbList
+
+    @catch_exception
     def Astar(self):
+        # Apagar boton de generar
         self.rutaShow["state"] ="disabled"
         
-        ## Algoritmo de recorrido del raton
-        opened = []
-        closed = []
-        First = 6
+        # Variables 
         self.AltoS = int(self.altext.get())
         self.AnchoS = int(self.anchtext.get())
-        Last = (self.AnchoS * self.AltoS) + (First - 1)
-        
+
         # Donde esta el Agente + (Centrado) | Puro Centro
         AgX = self.canvas.coords(self.agente)[0] + 7
         AgY = self.canvas.coords(self.agente)[1] + 7
@@ -187,158 +278,107 @@ class Maze():
         Mty = self.canvas.coords(self.meta)[1] + 7
 
         # Devuelve el ID de Agente y Meta
-        self.Agent_ID = self.canvas.find_closest(AgX + 9 , AgY + 9)[0]
-        self.Meta_ID  = self.canvas.find_closest(Mtx + 9 , Mty + 9)[0]
+        start = self.canvas.find_closest(AgX + 9 , AgY + 9)[0]
+        goal  = self.canvas.find_closest(Mtx + 9 , Mty + 9)[0]
 
-        # Indica si se llego a la meta
-        found = 0
-        ultimo = self.Agent_ID
+        # Inicializacion
+        closedSet = []
+        openSet = [start]
+        cameFrom = {}
+        gScore = {}
+        gScore[start] = 0 # Costo desde Agente hasta Agente
+        fScore = {} # Costos estimados de ruta desde Agente
+        Found = False
+        Last = start
+        self.Last = (self.AnchoS * self.AltoS) + 5
 
-        #SI ES PARED (Cortocircuito)
-        if self.isWall(self.Agent_ID): self.noPathFound()
-        elif self.isWall(self.Meta_ID): self.noPathFound()
+        fScore[start] = gScore[start] + self.gridDistance(start, Mtx, Mty)
+
+        if(self.isWall(start)):
+            self.noPathFound()
+
         else:
+
+            # Mientras existan para Visitar
             start_time = time.monotonic()
-            opened.append(self.Agent_ID)
+            while openSet:
+                current = self.getMin(openSet, fScore)
 
-            while len(opened) != 0:
-
-                cantidades = []
-                
-                for casilla in opened:
-    
-                    Heuristica = self.Heuristica(casilla, Mtx, Mty)
-
-                    if casilla + 1 == ultimo or casilla - 1 == ultimo or casilla == self.Agent_ID or \
-                       casilla + self.AltoS == ultimo or casilla - self.AltoS == ultimo:
-                        CostoAgente = self.adyacentesCamino(casilla, self.Agent_ID)
-                        
-                    else:
-                        CostoAgente = self.adyacentesCaminoDG(casilla, self.Agent_ID)
-                        
-                    cantidades.append(CostoAgente + Heuristica)
-
-
-                FindMinimo = min(cantidades)
-                Mindex = cantidades.index(FindMinimo)
-                Min_ID = opened[Mindex]
-
-                if (self.Meta_ID == Min_ID):
-                    self.canvas.itemconfigure(self.Meta_ID, fill="#D7EDF0")
+                if self.DiagOn.get() and current + self.AltoS + 1 == goal or current + self.AltoS - 1 == goal or \
+                   current - self.AltoS - 1 == goal or current - self.AltoS + 1 == goal:
                     end_time = time.monotonic()
+                    cameFrom[goal] = current
+                    Last = current
                     self.duracionResolucion(start_time, end_time)
-                    found = 1
+                    Found = True
+                    break
+                   
+
+                if current + 1 == goal or current - 1 == goal or current + self.AltoS == goal or current - self.AltoS == goal:
+                    
+                    end_time = time.monotonic()
+                    cameFrom[goal] = current
+                    Last = current
+                    self.duracionResolucion(start_time, end_time)
+                    Found = True
                     break
 
                 else:
-                    self.canvas.itemconfigure(Min_ID, fill="#D7EDF0")
+                    openSet.remove(current)
+                    closedSet.append(current)
 
-                    #Crear los sucesores
+                    for neighb in self.getNeighbors(current) :
+                        if neighb in closedSet:
+                            continue
 
+                        if current + 1 == Last or current - 1 == Last or current + self.AltoS == Last or current - self.AltoS == Last:
+                            tentativeGScore = gScore[current] + int(self.ladotext.get()) # Agrega la distancia del vecino Lateral
+                        else:
+                            tentativeGScore = gScore[current] + sqrt(2)* int(self.ladotext.get())  # Agrega la distancia del vecino Diagonal
 
-                    #NORTE
-                    if Min_ID % self.AltoS != 6:
-                        Norte = Min_ID - 1
-
-                        if (Norte not in opened) and (Norte not in closed) and (not self.isWall(Norte)):
-                            opened.append(Norte)
-
-                    #SUR
-                    if Min_ID % self.AltoS != 5:
-                        Sur = Min_ID + 1
-
-                        if (Sur not in opened) and (Sur not in closed) and (not self.isWall(Sur)):
-                            opened.append(Sur)
+                        if neighb not in openSet:
+                            openSet.append(neighb)
                             
-                    #ESTE
-                    if Min_ID + self.AltoS < Last:
-                        Este = Min_ID + self.AltoS
+                        elif tentativeGScore >= gScore[neighb]:
+                            continue 
 
-                        if (Este not in opened) and (Este not in closed) and (not self.isWall(Este)):
-                            opened.append(Este)
-                            
-                    #OESTE
-                    if Min_ID - self.AltoS > 6:
-                        Oeste = Min_ID - self.AltoS
-
-                        if (Oeste not in opened) and (Oeste not in closed) and (not self.isWall(Oeste)):
-                            opened.append(Oeste)
-
-
-                    if self.DiagOn.get():
-
-                        #NOROESTE
-                        if Min_ID % self.AltoS != 6 and Min_ID - self.AltoS > 6 :
-                            Noroeste = (Min_ID - self.AltoS) - 1
-
-                            if (Noroeste not in opened) and (Noroeste not in closed) and (not self.isWall(Noroeste)):
-                                opened.append(Noroeste)
+                        cameFrom[neighb] = current
+                        gScore[neighb] = tentativeGScore
+                        fScore[neighb] = gScore[neighb] + self.gridDistanceR(neighb, goal)
+                        Last = current
                         
-                        #NORESTE
-                        if Min_ID % self.AltoS != 6 and Min_ID + self.AltoS < Last :
-                            Noreste = (Min_ID + self.AltoS) - 1
-
-                            if (Noreste not in opened) and (Noreste not in closed) and (not self.isWall(Noreste)):
-                                opened.append(Noreste)
-                                
-                        #SUROESTE
-                        if Min_ID % self.AltoS != 5 and Min_ID - self.AltoS > 6 :
-                            Suroeste = (Min_ID - self.AltoS) + 1
-
-                            if (Suroeste not in opened) and (Suroeste not in closed) and (not self.isWall(Suroeste)):
-                                opened.append(Suroeste)
-
                         
-                        #SURESTE
-                        if Min_ID % self.AltoS != 5 and Min_ID + self.AltoS < Last :
-                            Sureste = (Min_ID + self.AltoS) + 1
-
-                            if (Sureste not in opened) and (Sureste not in closed) and (not self.isWall(Sureste)):
-                                opened.append(Sureste)
-
-
-                    # El ya visitado es cerrado
-                    ultimo = Min_ID
-                    Visited = opened[Mindex]
-                    opened.pop(Mindex)
-                    closed.append(Visited)
-
-
-            if not found:
-                self.noPathFound()
-
+            if not Found: self.noPathFound()
             else:
-                self.PathFound()
+                Camino = self.reconstructPath(cameFrom, current)
+                Camino.insert(len(Camino),goal)
+                self.dibujaPath(Camino)
+            
 
+    def reconstructPath(self, cameFrom, current):
+        totalPath = [current]
+        while current in cameFrom.keys():
+            current = cameFrom[current]
+            totalPath.append(current)
 
-
-    def isWall(self, ID):
-        if self.canvas.itemcget(ID, "fill") == "#334a58":
-            return True
-        else:
-            return False
-
-        
-    def adyacentesCamino(self, ID1, ID2):
-        Dist = abs(int(ID2) - int(ID1))
-        vLado = int(self.ladotext.get())
-        return vLado * ((Dist // self.AnchoS) + (Dist // self.AltoS))
-
-
-    def adyacentesCaminoDG(self, ID1, ID2):
-        Dist = abs(int(ID2) - int(ID1))
-        vLado = int(self.ladotext.get())
-        return (vLado * sqrt(2)) * ((Dist // self.AnchoS) + (Dist // self.AltoS))
-
-
-    def Heuristica(self, casilla, X2, Y2):
-        X1 = self.canvas.coords(casilla)[0] + 7
-        Y1 = self.canvas.coords(casilla)[1] + 7
-        return sqrt((X2 - X1)**2 + (Y2 - Y1)**2)
-
+        # get the reverse array...
+        return totalPath[::-1]
+    
+    @catch_exception
+    def dibujaPath(self, lista):
+        for i in lista:
+            self.canvas.itemconfigure(i, fill="#6ad8ca")
+            self.canvas.delete(self.agente)
+            X = self.canvas.coords(i)[0] + 10
+            Y = self.canvas.coords(i)[1] + 10
+            self.agente = self.canvas.create_oval(self.esquinas(X,Y), fill="#ff6600")
+            self.canvas.update()
+            time.sleep(0.08)
+        self.PathFound()
+            
 
     def duracionResolucion(self, start_time, end_time):
-        self.durationVoyage = str(timedelta(seconds = end_time - start_time))[0:10]
+        self.durationVoyage = str(timedelta(seconds = end_time - start_time))[0:12]
         text = "Duracion recorrido : " + self.durationVoyage
         self.duracionVoyage.config(text=text)
         self.duracionVoyage.update_idletasks()
@@ -421,7 +461,7 @@ class Maze():
         ## Crea la ventana y un canvas para dibujar
         self.root = tk.Tk()
         self.root.resizable(False, False)
-        self.last = None
+        self.lastBttn = None
 
         #Titulo
         titulillo = tk.Message(self.root, text = "◄ ♦ ○ Maze Solver Machine ○ ♦ ►", font = ("Courier",20), width = 500)
